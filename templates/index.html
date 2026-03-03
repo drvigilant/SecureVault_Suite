@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Vault Pro | Pulse Auth</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #050505; color: #FFFFFF; font-family: 'Inter', sans-serif; }
+        .matte-card { background-color: #0d0d0d; border: 1px solid #1a1a1a; }
+        .input-field { background-color: #151515; border: 1px solid #222; outline: none; color: #FFF; }
+        .btn-matte { background-color: #222; color: #FFF; border: 1px solid #333; transition: 0.3s; font-weight: 700; }
+        .btn-matte:hover { background-color: #FFF; color: #000; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-8">
+    <div class="w-full max-w-5xl">
+        <div class="text-center mb-12">
+            <h1 class="text-[11px] tracking-[1.5em] uppercase font-bold text-white">Quantum Pulse Authorization</h1>
+            <div class="flex justify-center items-center gap-4 mt-6">
+                <p id="uuid-display" class="text-[10px] text-gray-500 tracking-[0.4em] font-mono">{{ my_uuid }}</p>
+                <button onclick="copyUUID()" class="text-[9px] border border-gray-800 px-2 py-1 hover:bg-white hover:text-black transition">COPY_MY_ID</button>
+            </div>
+        </div>
+
+        <div id="ui-main" class="{% if blacklisted %}hidden{% endif %}">
+            <div class="grid md:grid-cols-2 gap-10">
+                <div class="matte-card p-10 rounded-lg">
+                    <h2 class="text-[10px] uppercase tracking-widest mb-10 border-b border-gray-900 pb-4 text-gray-400 font-bold">Secure Ingress (Sender)</h2>
+                    <form action="/encrypt" method="POST" enctype="multipart/form-data" class="space-y-6">
+                        <input type="file" name="file" required class="text-[10px] w-full text-white">
+                        <input type="text" name="uuid" placeholder="RECIPIENT_UUID" required class="input-field w-full p-4 text-[11px] tracking-widest rounded">
+                        <input type="password" name="password" placeholder="PASSPHRASE" required class="input-field w-full p-4 text-[11px] tracking-widest rounded">
+                        <button type="submit" class="btn-matte w-full py-4 text-[10px] uppercase tracking-widest">Seal for Recipient</button>
+                    </form>
+                </div>
+
+                <div class="matte-card p-10 rounded-lg">
+                    <h2 class="text-[10px] uppercase tracking-widest mb-10 border-b border-gray-900 pb-4 text-gray-400 font-bold">Secure Egress (Recipient)</h2>
+                    <form id="decrypt-form" class="space-y-6">
+                        <input type="file" id="d-file" required class="text-[10px] w-full text-white">
+                        <div class="py-2 px-4 bg-blue-900/10 border border-blue-500/20 rounded">
+                            <p class="text-[8px] text-blue-400 tracking-widest uppercase italic">Silent Hardware Scan Active</p>
+                        </div>
+                        <input type="password" id="d-pass" placeholder="PASSPHRASE" required class="input-field w-full p-4 text-[11px] tracking-widest rounded">
+                        <button type="submit" class="btn-matte w-full py-4 text-[10px] uppercase tracking-widest">Verify & Authorize</button>
+                    </form>
+                    <div id="status" class="mt-6 text-[10px] text-center uppercase tracking-widest font-bold h-4"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="blacklist" class="{% if not blacklisted %}hidden{% endif %} matte-card p-24 text-center border-red-900">
+            <h2 class="text-red-600 text-[12px] tracking-[0.6em] uppercase font-bold">Hardware Pulse Rejected</h2>
+            <p class="text-[10px] text-gray-500 mt-4 tracking-widest uppercase italic">Unauthorized environment detected. Access Revoked.</p>
+        </div>
+    </div>
+
+    <script>
+        function copyUUID() {
+            const text = document.getElementById('uuid-display').innerText;
+            navigator.clipboard.writeText(text);
+            alert("ID Copied. Send this to the person encrypting your file.");
+        }
+
+        document.getElementById('decrypt-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const status = document.getElementById('status');
+            status.innerText = "AUTHENTICATING HARDWARE...";
+            status.style.color = "#FFFFFF";
+
+            const formData = new FormData();
+            formData.append('file', document.getElementById('d-file').files[0]);
+            formData.append('password', document.getElementById('d-pass').value);
+
+            const res = await fetch('/decrypt', { method: 'POST', body: formData });
+            if (res.ok) {
+                const b = await res.blob();
+                const u = window.URL.createObjectURL(b);
+                const a = document.createElement('a'); a.href = u; a.download = "decrypted.zip"; a.click();
+                status.innerText = "SUCCESS: ACCESS GRANTED"; status.style.color = "#4ade80";
+            } else {
+                const data = await res.json();
+                if (data.error === "BLACKLISTED") { location.reload(); }
+                status.innerText = `DENIED: ATTEMPT ${data.attempts}/3`;
+                status.style.color = "#f87171";
+            }
+        };
+    </script>
+</body>
+</html>
