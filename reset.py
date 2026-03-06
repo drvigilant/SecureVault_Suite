@@ -1,5 +1,4 @@
-import os, shutil, platform
-from pathlib import Path
+import os, shutil
 
 def full_reset():
     print("[RESET] Initializing SecureVault System Wipe...")
@@ -15,13 +14,12 @@ def full_reset():
                 print(f"[ERROR] Failed to clear {folder}: {e}")
 
     for file in os.listdir('.'):
-        if file.endswith(".enc") or file.endswith("_unlocked.zip"):
+        if file.endswith(".enc") or file.endswith("_unlocked.dat") or file.endswith(".zip"):
             try:
                 os.remove(file)
                 print(f"[SUCCESS] Removed loose artifact: {file}")
             except:
                 pass
-
     print("[COMPLETE] System is now in a clean state.")
 
 if __name__ == "__main__":

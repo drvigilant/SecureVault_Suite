@@ -10,24 +10,19 @@
         tailwind.config = { darkMode: 'class' }
     </script>
     <style>
-        body { 
-            font-family: 'Hubot Sans', sans-serif; 
-            letter-spacing: 0.03em; 
-            line-height: 1.6;
-            transition: background-color 0.3s ease, color 0.3s ease; 
-        }
-        .glass-panel { transition: 0.3s ease; }
+        body { font-family: 'Hubot Sans', sans-serif; letter-spacing: 0.03em; line-height: 1.6; transition: background-color 0.3s, color 0.3s; }
+        .glass-panel { transition: 0.3s; }
         
         .dark body { background: #0a0a0a; color: #f3f4f6; }
         .dark .glass-panel { background: #111111; border: 1px solid #262626; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
-        .dark input { background: #000000; border: 1px solid #333333; color: #f3f4f6; padding: 12px; width: 100%; outline: none; transition: border-color 0.2s; }
+        .dark input { background: #000000; border: 1px solid #333333; color: #f3f4f6; padding: 12px; width: 100%; outline: none; }
         .dark input:focus { border-color: #f3f4f6; }
         .dark .btn-primary { background: #1a1a1a; color: #f3f4f6; border: 1px solid #333333; padding: 12px; width: 100%; font-weight: 600; cursor: pointer; transition: 0.2s; }
         .dark .btn-primary:hover { background: #f3f4f6; color: #000000; border-color: #f3f4f6; }
         
         body { background: #f9fafb; color: #111827; }
         .glass-panel { background: #ffffff; border: 1px solid #e5e7eb; box-shadow: 0 8px 32px rgba(0,0,0,0.05); }
-        input { background: #f3f4f6; border: 1px solid #d1d5db; color: #111827; padding: 12px; width: 100%; outline: none; transition: border-color 0.2s; }
+        input { background: #f3f4f6; border: 1px solid #d1d5db; color: #111827; padding: 12px; width: 100%; outline: none; }
         input:focus { border-color: #111827; }
         .btn-primary { background: #111827; color: #ffffff; padding: 12px; width: 100%; font-weight: 600; cursor: pointer; transition: 0.2s; border: 1px solid #111827; }
         .btn-primary:hover { background: #ffffff; color: #111827; }
@@ -40,9 +35,9 @@
     <div class="absolute top-6 right-6 flex items-center gap-4">
         <div class="flex flex-col items-end opacity-60">
             <span class="text-[10px] tracking-[0.15em] uppercase">Created by @drvigilant</span>
-            <a href="https://github.com/drvigilant/SecureVault_Suite.git" target="_blank" class="text-[9px] tracking-widest hover:text-blue-400 transition">github.com/drvigilant/SecureVault_Suite</a>
+            <a href="https://github.com/drvigilant/SecureVault_Suite.git" target="_blank" class="text-[9px] tracking-widest hover:text-blue-400">github.com/drvigilant/SecureVault_Suite</a>
         </div>
-        <button onclick="toggleTheme()" class="text-lg p-2 rounded-full border dark:border-gray-700 border-gray-300 hover:opacity-70 transition">🌗</button>
+        <button onclick="toggleTheme()" class="text-lg p-2 rounded-full border dark:border-gray-700 border-gray-300 hover:opacity-70">🌗</button>
     </div>
 
     <div class="w-full max-w-lg glass-panel p-10 rounded-xl relative">
@@ -50,16 +45,14 @@
         <div class="w-full h-[1px] dark:bg-gray-800 bg-gray-200 mb-8"></div>
 
         <div id="step-1">
-            <h2 class="text-xs font-bold mb-3 tracking-widest uppercase opacity-80">1. Local Hardware Identity</h2>
+            <h2 class="text-xs font-bold mb-3 tracking-widest uppercase opacity-80">1. Local Node Identity</h2>
             <div class="flex items-center justify-between p-4 dark:bg-black bg-gray-50 border dark:border-gray-800 border-gray-200 mb-8 rounded">
-                <span id="my-id" class="text-sm break-all font-mono opacity-90">{{ my_uuid }}</span>
-                <button onclick="copyMyId()" id="copy-btn" class="ml-4 px-3 py-2 bg-gray-200 dark:bg-gray-800 rounded hover:bg-gray-300 dark:hover:bg-gray-700 transition text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">
-                    Copy
-                </button>
+                <span id="my-id" class="text-sm break-all font-mono opacity-90"></span>
+                <button onclick="copyMyId()" id="copy-btn" class="ml-4 px-3 py-2 bg-gray-200 dark:bg-gray-800 rounded hover:bg-gray-300 dark:hover:bg-gray-700 text-[10px] font-bold uppercase tracking-widest whitespace-nowrap transition">Copy</button>
             </div>
             
             <h2 class="text-xs font-bold mb-3 tracking-widest uppercase opacity-80">2. Establish Connection</h2>
-            <p class="text-xs mb-3 opacity-60">Input the recipient's Hardware ID to initialize a secure peer session.</p>
+            <p class="text-xs mb-3 opacity-60">Input recipient's Node ID to initialize secure session.</p>
             <input type="text" id="partner-id" placeholder="Partner Node ID..." class="mb-5 rounded">
             <button onclick="initiateSession()" class="btn-primary rounded">Sync Session</button>
         </div>
@@ -72,9 +65,7 @@
                 <button onclick="selectRole('sender')" class="btn-primary rounded">Sender</button>
                 <div class="text-xs flex items-center justify-center opacity-50 border border-dashed dark:border-gray-700 border-gray-300 rounded">Awaiting partner...</div>
             </div>
-            <button onclick="location.reload()" class="mt-8 w-full p-3 border border-red-500/50 text-red-500 text-xs tracking-widest uppercase rounded hover:bg-red-500 hover:text-white transition">
-                [ABORT & DESTROY SESSION]
-            </button>
+            <button onclick="location.reload()" class="mt-8 w-full p-3 border border-red-500/50 text-red-500 text-xs tracking-widest uppercase rounded hover:bg-red-500 hover:text-white transition">[ABORT & DESTROY SESSION]</button>
         </div>
 
         <div id="step-sender" class="hidden">
@@ -84,10 +75,8 @@
                 <input type="password" id="s-pass" placeholder="Create Package Passphrase" required class="rounded">
                 <button type="submit" class="btn-primary rounded">Seal & Transmit</button>
             </form>
-            <p id="s-status" class="mt-5 text-[10px] text-center tracking-widest uppercase hidden opacity-70">Encrypting & Shredding Local Artifacts...</p>
-            <button onclick="location.reload()" class="mt-8 w-full p-3 border border-red-500/50 text-red-500 text-xs tracking-widest uppercase rounded hover:bg-red-500 hover:text-white transition">
-                [ABORT & DESTROY SESSION]
-            </button>
+            <p id="s-status" class="mt-5 text-[10px] text-center tracking-widest uppercase hidden opacity-70">Encrypting & Shredding...</p>
+            <button onclick="location.reload()" class="mt-8 w-full p-3 border border-red-500/50 text-red-500 text-xs tracking-widest uppercase rounded hover:bg-red-500 hover:text-white transition">[ABORT & DESTROY SESSION]</button>
         </div>
 
         <div id="step-receiver" class="hidden">
@@ -102,31 +91,34 @@
                 <button type="submit" class="btn-primary rounded">Verify & Unseal</button>
             </form>
             <p id="r-status" class="mt-5 text-[10px] text-center tracking-widest uppercase"></p>
-            <button onclick="location.reload()" class="mt-8 w-full p-3 border border-red-500/50 text-red-500 text-xs tracking-widest uppercase rounded hover:bg-red-500 hover:text-white transition">
-                [ABORT & DESTROY SESSION]
-            </button>
+            <button onclick="location.reload()" class="mt-8 w-full p-3 border border-red-500/50 text-red-500 text-xs tracking-widest uppercase rounded hover:bg-red-500 hover:text-white transition">[ABORT & DESTROY SESSION]</button>
         </div>
     </div>
 
     <script>
-        function toggleTheme() {
-            document.documentElement.classList.toggle('dark');
+        function toggleTheme() { document.documentElement.classList.toggle('dark'); }
+
+        let myId = localStorage.getItem('vault_node_id');
+        if (!myId) {
+            const array = new Uint32Array(2);
+            window.crypto.getRandomValues(array);
+            myId = 'NODE-' + array[0].toString(16).toUpperCase() + array[1].toString(16).toUpperCase();
+            localStorage.setItem('vault_node_id', myId);
         }
+        document.getElementById('my-id').innerText = myId;
 
         function copyMyId() {
             navigator.clipboard.writeText(myId);
             const btn = document.getElementById('copy-btn');
             btn.innerText = 'Copied!';
             btn.classList.add('text-green-500', 'dark:text-green-400');
-            setTimeout(() => {
-                btn.innerText = 'Copy';
-                btn.classList.remove('text-green-500', 'dark:text-green-400');
-            }, 2000);
+            setTimeout(() => { btn.innerText = 'Copy'; btn.classList.remove('text-green-500', 'dark:text-green-400'); }, 2000);
         }
 
-        const socket = io();
-        let myId = document.getElementById('my-id').innerText;
+        const socket = io({ transports: ['websocket'], upgrade: false });
         let currentRoom = "";
+
+        socket.on('connect', () => { socket.emit('register_node', { my_id: myId }); });
 
         function showStep(stepId) {
             ['step-1', 'step-2', 'step-sender', 'step-receiver'].forEach(id => {
@@ -139,7 +131,14 @@
             const partnerId = document.getElementById('partner-id').value;
             if (!partnerId) return alert("Please enter a Partner ID");
             socket.emit('join_session', { my_id: myId, partner_id: partnerId });
+            socket.emit('page_partner', { my_id: myId, partner_id: partnerId });
         }
+
+        socket.on('incoming_connection', (data) => {
+            currentRoom = data.room;
+            document.getElementById('partner-id').value = data.partner_id;
+            socket.emit('join_session', { my_id: myId, partner_id: data.partner_id });
+        });
 
         socket.on('session_established', (data) => {
             currentRoom = data.room;
@@ -147,22 +146,17 @@
             showStep('step-2');
         });
 
-        function selectRole(role) {
-            socket.emit('select_role', { room: currentRoom, my_id: myId });
-        }
+        function selectRole(role) { socket.emit('select_role', { room: currentRoom, my_id: myId }); }
 
         socket.on('role_assigned', (data) => {
-            if (data.sender_id === myId) {
-                showStep('step-sender');
-            } else {
-                showStep('step-receiver');
-            }
+            if (data.sender_id === myId) showStep('step-sender');
+            else showStep('step-receiver');
         });
 
         document.getElementById('upload-form').onsubmit = async (e) => {
             e.preventDefault();
             document.getElementById('s-status').classList.remove('hidden');
-            document.getElementById('s-status').innerText = "SEALING PACKAGE...";
+            document.getElementById('s-status').innerText = "SEALING & TRANSMITTING PACKAGE...";
             
             const fd = new FormData();
             fd.append('file', document.getElementById('s-file').files[0]);
@@ -171,7 +165,7 @@
 
             const res = await fetch('/upload', { method: 'POST', body: fd });
             if (res.ok) {
-                document.getElementById('s-status').innerText = "TRANSMISSION SUCCESSFUL. DATA SHREDDED.";
+                document.getElementById('s-status').innerText = "TRANSMISSION SUCCESSFUL. LOCAL ARTIFACTS SHREDDED.";
                 socket.emit('file_sealed', { room: currentRoom });
             }
         };
@@ -195,11 +189,11 @@
             if (res.ok) {
                 const b = await res.blob();
                 const u = window.URL.createObjectURL(b);
-                const a = document.createElement('a'); a.href = u; a.download = "SecureVault_Decrypted.zip"; a.click();
+                const a = document.createElement('a'); a.href = u; a.download = "SecureVault_Payload.zip"; a.click();
                 status.innerText = "SUCCESS. DATA UNSEALED.";
                 status.classList.add('text-green-500');
             } else {
-                status.innerText = "ACCESS DENIED: INVALID PASSPHRASE OR PULSE";
+                status.innerText = "ACCESS DENIED: INCORRECT PASSPHRASE";
                 status.classList.add('text-red-500');
             }
         };
