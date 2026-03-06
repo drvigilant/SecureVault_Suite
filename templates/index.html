@@ -1,89 +1,206 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <title>Vault Pro | Pulse Auth</title>
+    <title>SecureVault | @drvigilant</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <link href="https://fonts.cdnfonts.com/css/hubot-sans" rel="stylesheet">
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
     <style>
-        body { background-color: #050505; color: #FFFFFF; font-family: 'Inter', sans-serif; }
-        .matte-card { background-color: #0d0d0d; border: 1px solid #1a1a1a; }
-        .input-field { background-color: #151515; border: 1px solid #222; outline: none; color: #FFF; }
-        .btn-matte { background-color: #222; color: #FFF; border: 1px solid #333; transition: 0.3s; font-weight: 700; }
-        .btn-matte:hover { background-color: #FFF; color: #000; }
-        .hidden { display: none; }
+        body { 
+            font-family: 'Hubot Sans', sans-serif; 
+            letter-spacing: 0.03em; 
+            line-height: 1.6;
+            transition: background-color 0.3s ease, color 0.3s ease; 
+        }
+        .glass-panel { transition: 0.3s ease; }
+        
+        .dark body { background: #0a0a0a; color: #f3f4f6; }
+        .dark .glass-panel { background: #111111; border: 1px solid #262626; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+        .dark input { background: #000000; border: 1px solid #333333; color: #f3f4f6; padding: 12px; width: 100%; outline: none; transition: border-color 0.2s; }
+        .dark input:focus { border-color: #f3f4f6; }
+        .dark .btn-primary { background: #1a1a1a; color: #f3f4f6; border: 1px solid #333333; padding: 12px; width: 100%; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .dark .btn-primary:hover { background: #f3f4f6; color: #000000; border-color: #f3f4f6; }
+        
+        body { background: #f9fafb; color: #111827; }
+        .glass-panel { background: #ffffff; border: 1px solid #e5e7eb; box-shadow: 0 8px 32px rgba(0,0,0,0.05); }
+        input { background: #f3f4f6; border: 1px solid #d1d5db; color: #111827; padding: 12px; width: 100%; outline: none; transition: border-color 0.2s; }
+        input:focus { border-color: #111827; }
+        .btn-primary { background: #111827; color: #ffffff; padding: 12px; width: 100%; font-weight: 600; cursor: pointer; transition: 0.2s; border: 1px solid #111827; }
+        .btn-primary:hover { background: #ffffff; color: #111827; }
+        
+        .hidden { display: none !important; }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen p-8">
-    <div class="w-full max-w-5xl">
-        <div class="text-center mb-12">
-            <h1 class="text-[11px] tracking-[1.5em] uppercase font-bold text-white">Quantum Pulse Authorization</h1>
-            <div class="flex justify-center items-center gap-4 mt-6">
-                <p id="uuid-display" class="text-[10px] text-gray-500 tracking-[0.4em] font-mono">{{ my_uuid }}</p>
-                <button onclick="copyUUID()" class="text-[9px] border border-gray-800 px-2 py-1 hover:bg-white hover:text-black transition">COPY_MY_ID</button>
+<body class="min-h-screen flex flex-col items-center justify-center p-6 relative">
+
+    <div class="absolute top-6 right-6 flex items-center gap-4">
+        <div class="flex flex-col items-end opacity-60">
+            <span class="text-[10px] tracking-[0.15em] uppercase">Created by @drvigilant</span>
+            <a href="https://github.com/drvigilant/SecureVault_Suite.git" target="_blank" class="text-[9px] tracking-widest hover:text-blue-400 transition">github.com/drvigilant/SecureVault_Suite</a>
+        </div>
+        <button onclick="toggleTheme()" class="text-lg p-2 rounded-full border dark:border-gray-700 border-gray-300 hover:opacity-70 transition">🌗</button>
+    </div>
+
+    <div class="w-full max-w-lg glass-panel p-10 rounded-xl relative">
+        <h1 class="text-2xl font-bold tracking-tight mb-2 uppercase text-center">SecureVault Suite</h1>
+        <div class="w-full h-[1px] dark:bg-gray-800 bg-gray-200 mb-8"></div>
+
+        <div id="step-1">
+            <h2 class="text-xs font-bold mb-3 tracking-widest uppercase opacity-80">1. Local Hardware Identity</h2>
+            <div class="flex items-center justify-between p-4 dark:bg-black bg-gray-50 border dark:border-gray-800 border-gray-200 mb-8 rounded">
+                <span id="my-id" class="text-sm break-all font-mono opacity-90">{{ my_uuid }}</span>
+                <button onclick="copyMyId()" id="copy-btn" class="ml-4 px-3 py-2 bg-gray-200 dark:bg-gray-800 rounded hover:bg-gray-300 dark:hover:bg-gray-700 transition text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">
+                    Copy
+                </button>
             </div>
+            
+            <h2 class="text-xs font-bold mb-3 tracking-widest uppercase opacity-80">2. Establish Connection</h2>
+            <p class="text-xs mb-3 opacity-60">Input the recipient's Hardware ID to initialize a secure peer session.</p>
+            <input type="text" id="partner-id" placeholder="Partner Node ID..." class="mb-5 rounded">
+            <button onclick="initiateSession()" class="btn-primary rounded">Sync Session</button>
         </div>
 
-        <div id="ui-main" class="{% if blacklisted %}hidden{% endif %}">
-            <div class="grid md:grid-cols-2 gap-10">
-                <div class="matte-card p-10 rounded-lg">
-                    <h2 class="text-[10px] uppercase tracking-widest mb-10 border-b border-gray-900 pb-4 text-gray-400 font-bold">Secure Ingress (Sender)</h2>
-                    <form action="/encrypt" method="POST" enctype="multipart/form-data" class="space-y-6">
-                        <input type="file" name="file" required class="text-[10px] w-full text-white">
-                        <input type="text" name="uuid" placeholder="RECIPIENT_UUID" required class="input-field w-full p-4 text-[11px] tracking-widest rounded">
-                        <input type="password" name="password" placeholder="PASSPHRASE" required class="input-field w-full p-4 text-[11px] tracking-widest rounded">
-                        <button type="submit" class="btn-matte w-full py-4 text-[10px] uppercase tracking-widest">Seal for Recipient</button>
-                    </form>
-                </div>
-
-                <div class="matte-card p-10 rounded-lg">
-                    <h2 class="text-[10px] uppercase tracking-widest mb-10 border-b border-gray-900 pb-4 text-gray-400 font-bold">Secure Egress (Recipient)</h2>
-                    <form id="decrypt-form" class="space-y-6">
-                        <input type="file" id="d-file" required class="text-[10px] w-full text-white">
-                        <div class="py-2 px-4 bg-blue-900/10 border border-blue-500/20 rounded">
-                            <p class="text-[8px] text-blue-400 tracking-widest uppercase italic">Silent Hardware Scan Active</p>
-                        </div>
-                        <input type="password" id="d-pass" placeholder="PASSPHRASE" required class="input-field w-full p-4 text-[11px] tracking-widest rounded">
-                        <button type="submit" class="btn-matte w-full py-4 text-[10px] uppercase tracking-widest">Verify & Authorize</button>
-                    </form>
-                    <div id="status" class="mt-6 text-[10px] text-center uppercase tracking-widest font-bold h-4"></div>
-                </div>
+        <div id="step-2" class="hidden text-center">
+            <h2 class="text-xs font-bold mb-3 tracking-widest uppercase dark:text-gray-300">Session Established</h2>
+            <p class="text-xs mb-8 opacity-60">Room Hash: <span id="room-display" class="font-mono font-bold"></span></p>
+            <p class="mb-5 text-sm font-bold tracking-wide">Assign Local Node Role:</p>
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="selectRole('sender')" class="btn-primary rounded">Sender</button>
+                <div class="text-xs flex items-center justify-center opacity-50 border border-dashed dark:border-gray-700 border-gray-300 rounded">Awaiting partner...</div>
             </div>
+            <button onclick="location.reload()" class="mt-8 w-full p-3 border border-red-500/50 text-red-500 text-xs tracking-widest uppercase rounded hover:bg-red-500 hover:text-white transition">
+                [ABORT & DESTROY SESSION]
+            </button>
         </div>
 
-        <div id="blacklist" class="{% if not blacklisted %}hidden{% endif %} matte-card p-24 text-center border-red-900">
-            <h2 class="text-red-600 text-[12px] tracking-[0.6em] uppercase font-bold">Hardware Pulse Rejected</h2>
-            <p class="text-[10px] text-gray-500 mt-4 tracking-widest uppercase italic">Unauthorized environment detected. Access Revoked.</p>
+        <div id="step-sender" class="hidden">
+            <h2 class="text-xs font-bold mb-5 tracking-widest uppercase">Secure Ingress (Sender)</h2>
+            <form id="upload-form" class="space-y-5">
+                <input type="file" id="s-file" required class="text-sm opacity-80">
+                <input type="password" id="s-pass" placeholder="Create Package Passphrase" required class="rounded">
+                <button type="submit" class="btn-primary rounded">Seal & Transmit</button>
+            </form>
+            <p id="s-status" class="mt-5 text-[10px] text-center tracking-widest uppercase hidden opacity-70">Encrypting & Shredding Local Artifacts...</p>
+            <button onclick="location.reload()" class="mt-8 w-full p-3 border border-red-500/50 text-red-500 text-xs tracking-widest uppercase rounded hover:bg-red-500 hover:text-white transition">
+                [ABORT & DESTROY SESSION]
+            </button>
+        </div>
+
+        <div id="step-receiver" class="hidden">
+            <h2 class="text-xs font-bold mb-5 tracking-widest uppercase">Secure Egress (Receiver)</h2>
+            <div id="waiting-msg" class="text-xs text-center p-8 border border-dashed dark:border-gray-700 border-gray-300 mb-5 animate-pulse rounded opacity-70">
+                Awaiting encrypted package from Sender node...
+            </div>
+            
+            <form id="download-form" class="space-y-5 hidden">
+                <p class="text-xs text-center mb-2 opacity-80">Package Received. Authentication required.</p>
+                <input type="password" id="r-pass" placeholder="Enter Package Passphrase" required class="rounded">
+                <button type="submit" class="btn-primary rounded">Verify & Unseal</button>
+            </form>
+            <p id="r-status" class="mt-5 text-[10px] text-center tracking-widest uppercase"></p>
+            <button onclick="location.reload()" class="mt-8 w-full p-3 border border-red-500/50 text-red-500 text-xs tracking-widest uppercase rounded hover:bg-red-500 hover:text-white transition">
+                [ABORT & DESTROY SESSION]
+            </button>
         </div>
     </div>
 
     <script>
-        function copyUUID() {
-            const text = document.getElementById('uuid-display').innerText;
-            navigator.clipboard.writeText(text);
-            alert("ID Copied. Send this to the person encrypting your file.");
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
         }
 
-        document.getElementById('decrypt-form').onsubmit = async (e) => {
+        function copyMyId() {
+            navigator.clipboard.writeText(myId);
+            const btn = document.getElementById('copy-btn');
+            btn.innerText = 'Copied!';
+            btn.classList.add('text-green-500', 'dark:text-green-400');
+            setTimeout(() => {
+                btn.innerText = 'Copy';
+                btn.classList.remove('text-green-500', 'dark:text-green-400');
+            }, 2000);
+        }
+
+        const socket = io();
+        let myId = document.getElementById('my-id').innerText;
+        let currentRoom = "";
+
+        function showStep(stepId) {
+            ['step-1', 'step-2', 'step-sender', 'step-receiver'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(stepId).classList.remove('hidden');
+        }
+
+        function initiateSession() {
+            const partnerId = document.getElementById('partner-id').value;
+            if (!partnerId) return alert("Please enter a Partner ID");
+            socket.emit('join_session', { my_id: myId, partner_id: partnerId });
+        }
+
+        socket.on('session_established', (data) => {
+            currentRoom = data.room;
+            document.getElementById('room-display').innerText = currentRoom;
+            showStep('step-2');
+        });
+
+        function selectRole(role) {
+            socket.emit('select_role', { room: currentRoom, my_id: myId });
+        }
+
+        socket.on('role_assigned', (data) => {
+            if (data.sender_id === myId) {
+                showStep('step-sender');
+            } else {
+                showStep('step-receiver');
+            }
+        });
+
+        document.getElementById('upload-form').onsubmit = async (e) => {
             e.preventDefault();
-            const status = document.getElementById('status');
-            status.innerText = "AUTHENTICATING HARDWARE...";
-            status.style.color = "#FFFFFF";
+            document.getElementById('s-status').classList.remove('hidden');
+            document.getElementById('s-status').innerText = "SEALING PACKAGE...";
+            
+            const fd = new FormData();
+            fd.append('file', document.getElementById('s-file').files[0]);
+            fd.append('password', document.getElementById('s-pass').value);
+            fd.append('room', currentRoom);
 
-            const formData = new FormData();
-            formData.append('file', document.getElementById('d-file').files[0]);
-            formData.append('password', document.getElementById('d-pass').value);
+            const res = await fetch('/upload', { method: 'POST', body: fd });
+            if (res.ok) {
+                document.getElementById('s-status').innerText = "TRANSMISSION SUCCESSFUL. DATA SHREDDED.";
+                socket.emit('file_sealed', { room: currentRoom });
+            }
+        };
 
-            const res = await fetch('/decrypt', { method: 'POST', body: formData });
+        socket.on('package_ready', (data) => {
+            document.getElementById('waiting-msg').classList.add('hidden');
+            document.getElementById('download-form').classList.remove('hidden');
+        });
+
+        document.getElementById('download-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const status = document.getElementById('r-status');
+            status.innerText = "AUTHENTICATING PULSE...";
+            status.style.color = "";
+            
+            const fd = new FormData();
+            fd.append('password', document.getElementById('r-pass').value);
+            fd.append('room', currentRoom);
+
+            const res = await fetch('/download', { method: 'POST', body: fd });
             if (res.ok) {
                 const b = await res.blob();
                 const u = window.URL.createObjectURL(b);
-                const a = document.createElement('a'); a.href = u; a.download = "decrypted.zip"; a.click();
-                status.innerText = "SUCCESS: ACCESS GRANTED"; status.style.color = "#4ade80";
+                const a = document.createElement('a'); a.href = u; a.download = "SecureVault_Decrypted.zip"; a.click();
+                status.innerText = "SUCCESS. DATA UNSEALED.";
+                status.classList.add('text-green-500');
             } else {
-                const data = await res.json();
-                if (data.error === "BLACKLISTED") { location.reload(); }
-                status.innerText = `DENIED: ATTEMPT ${data.attempts}/3`;
-                status.style.color = "#f87171";
+                status.innerText = "ACCESS DENIED: INVALID PASSPHRASE OR PULSE";
+                status.classList.add('text-red-500');
             }
         };
     </script>

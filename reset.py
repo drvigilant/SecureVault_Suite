@@ -1,25 +1,30 @@
-import os
-import subprocess
+import os, shutil, platform
 from pathlib import Path
 
-LOCK_FILE = Path(os.environ.get('APPDATA', '.')) / ".system_lock"
-
-def premium_reset():
-    print("VAULT PRO | LICENSED RECOVERY UTILITY")
-    token = input("\nENTER PREMIUM RESET TOKEN: ")
+def full_reset():
+    print("[RESET] Initializing SecureVault System Wipe...")
     
-    # Requirement #4: Validation (Token can be changed for different users)
-    if token == "ADMIN-RESET-2026":
-        if LOCK_FILE.exists():
-            # Remove system/hidden attributes then delete
-            subprocess.run(["attrib", "-H", "-S", str(LOCK_FILE)], capture_output=True)
-            os.remove(LOCK_FILE)
-            print("\n[SUCCESS] Machine state cleared. Access restored.")
-        else:
-            print("\n[INFO] Machine is already authorized.")
-    else:
-        print("\n[ERROR] Invalid token. Authorization denied.")
+    target_dirs = ['uploads', 'vault_data', '__pycache__']
+    for folder in target_dirs:
+        if os.path.exists(folder):
+            try:
+                shutil.rmtree(folder)
+                os.makedirs(folder)
+                print(f"[SUCCESS] Purged and reset: {folder}/")
+            except Exception as e:
+                print(f"[ERROR] Failed to clear {folder}: {e}")
+
+    for file in os.listdir('.'):
+        if file.endswith(".enc") or file.endswith("_unlocked.zip"):
+            try:
+                os.remove(file)
+                print(f"[SUCCESS] Removed loose artifact: {file}")
+            except:
+                pass
+
+    print("[COMPLETE] System is now in a clean state.")
 
 if __name__ == "__main__":
-    premium_reset()
-    input("\nPress Enter to exit...")
+    confirm = input("Wipe all buffers and temporary locks? (y/n): ")
+    if confirm.lower() == 'y':
+        full_reset()
