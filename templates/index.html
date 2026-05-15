@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>SecureVault | @drvigilant</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <link href="https://fonts.cdnfonts.com/css/hubot-sans" rel="stylesheet">
     <script>
         tailwind.config = { darkMode: 'class' }
@@ -12,21 +11,21 @@
     <style>
         body { font-family: 'Hubot Sans', sans-serif; letter-spacing: 0.03em; line-height: 1.6; transition: background-color 0.3s, color 0.3s; }
         .glass-panel { transition: 0.3s; }
-        
+
         .dark body { background: #0a0a0a; color: #f3f4f6; }
         .dark .glass-panel { background: #111111; border: 1px solid #262626; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
         .dark input { background: #000000; border: 1px solid #333333; color: #f3f4f6; padding: 12px; width: 100%; outline: none; }
         .dark input:focus { border-color: #f3f4f6; }
         .dark .btn-primary { background: #1a1a1a; color: #f3f4f6; border: 1px solid #333333; padding: 12px; width: 100%; font-weight: 600; cursor: pointer; transition: 0.2s; }
         .dark .btn-primary:hover { background: #f3f4f6; color: #000000; border-color: #f3f4f6; }
-        
+
         body { background: #f9fafb; color: #111827; }
         .glass-panel { background: #ffffff; border: 1px solid #e5e7eb; box-shadow: 0 8px 32px rgba(0,0,0,0.05); }
         input { background: #f3f4f6; border: 1px solid #d1d5db; color: #111827; padding: 12px; width: 100%; outline: none; }
         input:focus { border-color: #111827; }
         .btn-primary { background: #111827; color: #ffffff; padding: 12px; width: 100%; font-weight: 600; cursor: pointer; transition: 0.2s; border: 1px solid #111827; }
         .btn-primary:hover { background: #ffffff; color: #111827; }
-        
+
         .hidden { display: none !important; }
     </style>
 </head>
@@ -50,7 +49,7 @@
                 <span id="my-id" class="text-sm break-all font-mono opacity-90"></span>
                 <button onclick="copyMyId()" id="copy-btn" class="ml-4 px-3 py-2 bg-gray-200 dark:bg-gray-800 rounded hover:bg-gray-300 dark:hover:bg-gray-700 text-[10px] font-bold uppercase tracking-widest whitespace-nowrap transition">Copy</button>
             </div>
-            
+
             <h2 class="text-xs font-bold mb-3 tracking-widest uppercase opacity-80">2. Establish Connection</h2>
             <p class="text-xs mb-3 opacity-60">Input recipient's Node ID to initialize secure session.</p>
             <input type="text" id="partner-id" placeholder="Partner Node ID..." class="mb-5 rounded">
@@ -62,7 +61,7 @@
             <p class="text-xs mb-8 opacity-60">Room Hash: <span id="room-display" class="font-mono font-bold"></span></p>
             <p class="mb-5 text-sm font-bold tracking-wide">Assign Local Node Role:</p>
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="selectRole('sender')" class="btn-primary rounded">Sender</button>
+                <button id="sender-btn" onclick="selectRole('sender')" class="btn-primary rounded" style="opacity:0.4; pointer-events:none;">Sender</button>
                 <div class="text-xs flex items-center justify-center opacity-50 border border-dashed dark:border-gray-700 border-gray-300 rounded">Awaiting partner...</div>
             </div>
             <button onclick="location.reload()" class="mt-8 w-full p-3 border border-red-500/50 text-red-500 text-xs tracking-widest uppercase rounded hover:bg-red-500 hover:text-white transition">[ABORT & DESTROY SESSION]</button>
@@ -75,7 +74,7 @@
                 <input type="password" id="s-pass" placeholder="Create Package Passphrase" required class="rounded">
                 <button type="submit" class="btn-primary rounded">Seal & Transmit</button>
             </form>
-            <p id="s-status" class="mt-5 text-[10px] text-center tracking-widest uppercase hidden opacity-70">Encrypting & Shredding...</p>
+            <p id="s-status" class="mt-5 text-[10px] text-center tracking-widest uppercase hidden opacity-70"></p>
             <button onclick="location.reload()" class="mt-8 w-full p-3 border border-red-500/50 text-red-500 text-xs tracking-widest uppercase rounded hover:bg-red-500 hover:text-white transition">[ABORT & DESTROY SESSION]</button>
         </div>
 
@@ -84,7 +83,7 @@
             <div id="waiting-msg" class="text-xs text-center p-8 border border-dashed dark:border-gray-700 border-gray-300 mb-5 animate-pulse rounded opacity-70">
                 Awaiting encrypted package from Sender node...
             </div>
-            
+
             <form id="download-form" class="space-y-5 hidden">
                 <p class="text-xs text-center mb-2 opacity-80">Package Received. Authentication required.</p>
                 <input type="password" id="r-pass" placeholder="Enter Package Passphrase" required class="rounded">
@@ -112,13 +111,61 @@
             const btn = document.getElementById('copy-btn');
             btn.innerText = 'Copied!';
             btn.classList.add('text-green-500', 'dark:text-green-400');
-            setTimeout(() => { btn.innerText = 'Copy'; btn.classList.remove('text-green-500', 'dark:text-green-400'); }, 2000);
+            setTimeout(() => {
+                btn.innerText = 'Copy';
+                btn.classList.remove('text-green-500', 'dark:text-green-400');
+            }, 2000);
         }
 
-        const socket = io({ transports: ['websocket'], upgrade: false });
+        const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+        const ws = new WebSocket(`${proto}://${location.host}/ws`);
         let currentRoom = "";
+        let senderBtnReady = false;
 
-        socket.on('connect', () => { socket.emit('register_node', { my_id: myId }); });
+        function emit(event, data) {
+            ws.send(JSON.stringify({ event, data }));
+        }
+
+        ws.onopen = () => {
+            emit('register_node', { my_id: myId });
+        };
+
+        ws.onmessage = (e) => {
+            const { event, data } = JSON.parse(e.data);
+
+            if (event === 'incoming_connection') {
+                currentRoom = data.room;
+                document.getElementById('partner-id').value = data.partner_id;
+                emit('join_session', { my_id: myId, partner_id: data.partner_id });
+            }
+
+            if (event === 'session_established') {
+                currentRoom = data.room;
+                document.getElementById('room-display').innerText = currentRoom;
+                showStep('step-2');
+                emit('ready_in_room', { room: currentRoom });
+            }
+
+            if (event === 'partner_ready') {
+                const btn = document.getElementById('sender-btn');
+                btn.style.opacity = '1';
+                btn.style.pointerEvents = 'auto';
+                senderBtnReady = true;
+            }
+
+            if (event === 'role_assigned') {
+                if (data.role === 'sender') showStep('step-sender');
+                else showStep('step-receiver');
+            }
+
+            if (event === 'package_ready') {
+                document.getElementById('waiting-msg').classList.add('hidden');
+                document.getElementById('download-form').classList.remove('hidden');
+            }
+        };
+
+        ws.onclose = () => console.log('[WS] Connection closed');
+        ws.onerror = (e) => console.error('[WS] Error', e);
 
         function showStep(stepId) {
             ['step-1', 'step-2', 'step-sender', 'step-receiver'].forEach(id => {
@@ -128,38 +175,23 @@
         }
 
         function initiateSession() {
-            const partnerId = document.getElementById('partner-id').value;
+            const partnerId = document.getElementById('partner-id').value.trim();
             if (!partnerId) return alert("Please enter a Partner ID");
-            socket.emit('join_session', { my_id: myId, partner_id: partnerId });
-            socket.emit('page_partner', { my_id: myId, partner_id: partnerId });
+            emit('join_session', { my_id: myId, partner_id: partnerId });
+            emit('page_partner', { my_id: myId, partner_id: partnerId });
         }
 
-        socket.on('incoming_connection', (data) => {
-            currentRoom = data.room;
-            document.getElementById('partner-id').value = data.partner_id;
-            socket.emit('join_session', { my_id: myId, partner_id: data.partner_id });
-        });
-
-        socket.on('session_established', (data) => {
-            currentRoom = data.room;
-            document.getElementById('room-display').innerText = currentRoom;
-            showStep('step-2');
-        });
-
-       	function selectRole(role) {
-    		socket.emit('select_role', { room: currentRoom, my_id: myId });
-	}
-	
-	socket.on('role_assigned', (data) => {
-    		if (data.role === 'sender') showStep('step-sender');
-    		else showStep('step-receiver');
-	});
+        function selectRole(role) {
+            if (!senderBtnReady) return;
+            emit('select_role', { room: currentRoom, my_id: myId });
+        }
 
         document.getElementById('upload-form').onsubmit = async (e) => {
             e.preventDefault();
-            document.getElementById('s-status').classList.remove('hidden');
-            document.getElementById('s-status').innerText = "SEALING & TRANSMITTING PACKAGE...";
-            
+            const status = document.getElementById('s-status');
+            status.classList.remove('hidden');
+            status.innerText = "SEALING & TRANSMITTING PACKAGE...";
+
             const fd = new FormData();
             fd.append('file', document.getElementById('s-file').files[0]);
             fd.append('password', document.getElementById('s-pass').value);
@@ -167,22 +199,19 @@
 
             const res = await fetch('/upload', { method: 'POST', body: fd });
             if (res.ok) {
-                document.getElementById('s-status').innerText = "TRANSMISSION SUCCESSFUL. LOCAL ARTIFACTS SHREDDED.";
-                socket.emit('file_sealed', { room: currentRoom });
+                status.innerText = "TRANSMISSION SUCCESSFUL. LOCAL ARTIFACTS SHREDDED.";
+                emit('file_sealed', { room: currentRoom });
+            } else {
+                status.innerText = "TRANSMISSION FAILED.";
             }
         };
-
-        socket.on('package_ready', (data) => {
-            document.getElementById('waiting-msg').classList.add('hidden');
-            document.getElementById('download-form').classList.remove('hidden');
-        });
 
         document.getElementById('download-form').onsubmit = async (e) => {
             e.preventDefault();
             const status = document.getElementById('r-status');
             status.innerText = "AUTHENTICATING PULSE...";
             status.style.color = "";
-            
+
             const fd = new FormData();
             fd.append('password', document.getElementById('r-pass').value);
             fd.append('room', currentRoom);
@@ -191,7 +220,10 @@
             if (res.ok) {
                 const b = await res.blob();
                 const u = window.URL.createObjectURL(b);
-                const a = document.createElement('a'); a.href = u; a.download = "SecureVault_Payload.zip"; a.click();
+                const a = document.createElement('a');
+                a.href = u;
+                a.download = "SecureVault_Payload.bin";
+                a.click();
                 status.innerText = "SUCCESS. DATA UNSEALED.";
                 status.classList.add('text-green-500');
             } else {

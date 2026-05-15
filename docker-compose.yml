@@ -6,15 +6,8 @@ services:
       - "5000:5000"
     volumes:
       - vault_uploads:/app/uploads
-    env_file:
-      - .env
+      - ./.env:/app/.env:ro
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
 
 volumes:
   vault_uploads:
