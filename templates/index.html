@@ -146,12 +146,14 @@
             showStep('step-2');
         });
 
-        function selectRole(role) { socket.emit('select_role', { room: currentRoom, my_id: myId }); }
-
-        socket.on('role_assigned', (data) => {
-            if (data.sender_id === myId) showStep('step-sender');
-            else showStep('step-receiver');
-        });
+       	function selectRole(role) {
+    		socket.emit('select_role', { room: currentRoom, my_id: myId });
+	}
+	
+	socket.on('role_assigned', (data) => {
+    		if (data.role === 'sender') showStep('step-sender');
+    		else showStep('step-receiver');
+	});
 
         document.getElementById('upload-form').onsubmit = async (e) => {
             e.preventDefault();
