@@ -4,3 +4,4 @@ uploads/
 *.enc
 __pycache__/
 *.pyc
+.env
