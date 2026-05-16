@@ -85,7 +85,7 @@
                 <button type="submit" class="btn-primary rounded">Verify & Unseal</button>
             </form>
             <p id="r-status" class="mt-5 text-[10px] text-center tracking-widest uppercase"></p>
-            <button onclick="location.reload()" class="mt-8 w-full p-3 border border-red-500/50 text-red-500 text.xs tracking-widest uppercase rounded hover:bg-red-500 hover:text-white transition">[ABORT & DESTROY SESSION]</button>
+            <button onclick="location.reload()" class="mt-8 w-full p-3 border border-red-500/50 text-red-500 text-xs tracking-widest uppercase rounded hover:bg-red-500 hover:text-white transition">[ABORT & DESTROY SESSION]</button>
         </div>
     </div>
 
@@ -227,6 +227,12 @@
             if (res.ok) {
                 status.innerText = "TRANSMISSION SUCCESSFUL. LOCAL ARTIFACTS SHREDDED.";
                 emit('file_sealed', { room: currentRoom });
+                setTimeout(() => {
+                    document.getElementById('s-file').value = '';
+                    document.getElementById('s-pass').value = '';
+                    status.innerText = '';
+                    status.classList.add('hidden');
+                }, 3000);
             } else {
                 status.innerText = "TRANSMISSION FAILED.";
             }
@@ -258,6 +264,13 @@
                 a.click();
                 status.innerText = "SUCCESS. DATA UNSEALED.";
                 status.classList.add('text-green-500');
+                setTimeout(() => {
+                    document.getElementById('waiting-msg').classList.remove('hidden');
+                    document.getElementById('download-form').classList.add('hidden');
+                    document.getElementById('r-pass').value = '';
+                    status.innerText = '';
+                    status.classList.remove('text-green-500');
+                }, 3000);
             } else {
                 status.innerText = "ACCESS DENIED: INCORRECT PASSPHRASE";
                 status.classList.add('text-red-500');
