@@ -11,21 +11,18 @@
     <style>
         body { font-family: 'Hubot Sans', sans-serif; letter-spacing: 0.03em; line-height: 1.6; transition: background-color 0.3s, color 0.3s; }
         .glass-panel { transition: 0.3s; }
-
         .dark body { background: #0a0a0a; color: #f3f4f6; }
         .dark .glass-panel { background: #111111; border: 1px solid #262626; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
         .dark input { background: #000000; border: 1px solid #333333; color: #f3f4f6; padding: 12px; width: 100%; outline: none; }
         .dark input:focus { border-color: #f3f4f6; }
         .dark .btn-primary { background: #1a1a1a; color: #f3f4f6; border: 1px solid #333333; padding: 12px; width: 100%; font-weight: 600; cursor: pointer; transition: 0.2s; }
         .dark .btn-primary:hover { background: #f3f4f6; color: #000000; border-color: #f3f4f6; }
-
         body { background: #f9fafb; color: #111827; }
         .glass-panel { background: #ffffff; border: 1px solid #e5e7eb; box-shadow: 0 8px 32px rgba(0,0,0,0.05); }
         input { background: #f3f4f6; border: 1px solid #d1d5db; color: #111827; padding: 12px; width: 100%; outline: none; }
         input:focus { border-color: #111827; }
         .btn-primary { background: #111827; color: #ffffff; padding: 12px; width: 100%; font-weight: 600; cursor: pointer; transition: 0.2s; border: 1px solid #111827; }
         .btn-primary:hover { background: #ffffff; color: #111827; }
-
         .hidden { display: none !important; }
     </style>
 </head>
@@ -49,7 +46,6 @@
                 <span id="my-id" class="text-sm break-all font-mono opacity-90"></span>
                 <button onclick="copyMyId()" id="copy-btn" class="ml-4 px-3 py-2 bg-gray-200 dark:bg-gray-800 rounded hover:bg-gray-300 dark:hover:bg-gray-700 text-[10px] font-bold uppercase tracking-widest whitespace-nowrap transition">Copy</button>
             </div>
-
             <h2 class="text-xs font-bold mb-3 tracking-widest uppercase opacity-80">2. Establish Connection</h2>
             <p class="text-xs mb-3 opacity-60">Input recipient's Node ID to initialize secure session.</p>
             <input type="text" id="partner-id" placeholder="Partner Node ID..." class="mb-5 rounded">
@@ -83,14 +79,13 @@
             <div id="waiting-msg" class="text-xs text-center p-8 border border-dashed dark:border-gray-700 border-gray-300 mb-5 animate-pulse rounded opacity-70">
                 Awaiting encrypted package from Sender node...
             </div>
-
             <form id="download-form" class="space-y-5 hidden">
                 <p class="text-xs text-center mb-2 opacity-80">Package Received. Authentication required.</p>
                 <input type="password" id="r-pass" placeholder="Enter Package Passphrase" required class="rounded">
                 <button type="submit" class="btn-primary rounded">Verify & Unseal</button>
             </form>
             <p id="r-status" class="mt-5 text-[10px] text-center tracking-widest uppercase"></p>
-            <button onclick="location.reload()" class="mt-8 w-full p-3 border border-red-500/50 text-red-500 text-xs tracking-widest uppercase rounded hover:bg-red-500 hover:text-white transition">[ABORT & DESTROY SESSION]</button>
+            <button onclick="location.reload()" class="mt-8 w-full p-3 border border-red-500/50 text-red-500 text.xs tracking-widest uppercase rounded hover:bg-red-500 hover:text-white transition">[ABORT & DESTROY SESSION]</button>
         </div>
     </div>
 
@@ -107,13 +102,40 @@
         document.getElementById('my-id').innerText = myId;
 
         function copyMyId() {
-            navigator.clipboard.writeText(myId);
+            const text = myId;
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showCopied();
+                }).catch(() => fallbackCopy(text));
+            } else {
+                fallbackCopy(text);
+            }
+        }
+
+        function fallbackCopy(text) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            try {
+                document.execCommand('copy');
+                showCopied();
+            } catch (e) {
+                alert('Copy failed. Please copy manually: ' + text);
+            }
+            document.body.removeChild(ta);
+        }
+
+        function showCopied() {
             const btn = document.getElementById('copy-btn');
             btn.innerText = 'Copied!';
-            btn.classList.add('text-green-500', 'dark:text-green-400');
+            btn.classList.add('text-green-500');
             setTimeout(() => {
                 btn.innerText = 'Copy';
-                btn.classList.remove('text-green-500', 'dark:text-green-400');
+                btn.classList.remove('text-green-500');
             }, 2000);
         }
 
@@ -121,6 +143,7 @@
         const ws = new WebSocket(`${proto}://${location.host}/ws`);
         let currentRoom = "";
         let senderBtnReady = false;
+        let originalFileName = "SecureVault_Payload.bin";
 
         function emit(event, data) {
             ws.send(JSON.stringify({ event, data }));
@@ -192,8 +215,11 @@
             status.classList.remove('hidden');
             status.innerText = "SEALING & TRANSMITTING PACKAGE...";
 
+            const fileInput = document.getElementById('s-file');
+            originalFileName = fileInput.files[0].name;
+
             const fd = new FormData();
-            fd.append('file', document.getElementById('s-file').files[0]);
+            fd.append('file', fileInput.files[0]);
             fd.append('password', document.getElementById('s-pass').value);
             fd.append('room', currentRoom);
 
@@ -218,11 +244,17 @@
 
             const res = await fetch('/download', { method: 'POST', body: fd });
             if (res.ok) {
+                const contentDisposition = res.headers.get('Content-Disposition');
+                let filename = originalFileName;
+                if (contentDisposition) {
+                    const match = contentDisposition.match(/filename="?([^"]+)"?/);
+                    if (match) filename = match[1];
+                }
                 const b = await res.blob();
                 const u = window.URL.createObjectURL(b);
                 const a = document.createElement('a');
                 a.href = u;
-                a.download = "SecureVault_Payload.bin";
+                a.download = filename;
                 a.click();
                 status.innerText = "SUCCESS. DATA UNSEALED.";
                 status.classList.add('text-green-500');

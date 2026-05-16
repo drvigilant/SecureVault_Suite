@@ -7,6 +7,7 @@ services:
     volumes:
       - vault_uploads:/app/uploads
       - ./.env:/app/.env:ro
+      - ./certs:/app/certs:ro
     restart: unless-stopped
 
 volumes:

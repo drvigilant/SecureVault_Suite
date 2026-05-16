@@ -15,7 +15,7 @@ import (
 )
 
 const uploadFolder = "uploads"
-const maxUploadSize = 100 << 20 // 100MB
+const maxUploadSize = 500 << 20 // 500MB
 
 var hub = newHub()
 
@@ -47,7 +47,7 @@ func main() {
 	r.HandleFunc("/download", downloadHandler(vaultPass)).Methods("POST")
 
 	fmt.Println("[SYSTEM] SecureVault Go Engine running on :5000")
-	log.Fatal(http.ListenAndServe(":5000", r))
+	log.Fatal(http.ListenAndServeTLS(":5000", "certs/cert.pem", "certs/key.pem", r))
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -111,18 +111,22 @@ func uploadHandler(vaultPass string) http.HandlerFunc {
 		tmpPath := filepath.Join(uploadFolder, filepath.Base(header.Filename))
 		tmp, err := os.Create(tmpPath)
 		if err != nil {
-			jsonError(w, "Server error", 500)
-			return
+    		    jsonError(w, "Server error", 500)
+    		    return
 		}
 		io.Copy(tmp, file)
 		tmp.Close()
 
 		encPath := filepath.Join(uploadFolder, room+".enc")
 		if err := encryptFile(tmpPath, encPath, password, room, vaultPass); err != nil {
-			jsonError(w, "Encryption failed", 500)
-			return
+    		    jsonError(w, "Encryption failed", 500)
+    		    return
 		}
 		secureShred(tmpPath, 3)
+
+		// Save original filename for receiver
+		nameFile := filepath.Join(uploadFolder, room+".name")
+		os.WriteFile(nameFile, []byte(filepath.Base(header.Filename)), 0600)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
@@ -152,7 +156,14 @@ func downloadHandler(vaultPass string) http.HandlerFunc {
 			secureShred(decPath, 3)
 		}()
 
-		w.Header().Set("Content-Disposition", "attachment; filename=SecureVault_Payload.bin")
+		originalName := "SecureVault_Payload.bin"
+		nameFile := filepath.Join(uploadFolder, room+".name")
+		if b, err := os.ReadFile(nameFile); err == nil {
+    		    originalName = string(b)
+    		    os.Remove(nameFile)
+		}
+
+		w.Header().Set("Content-Disposition", "attachment; filename=\""+originalName+"\"")
 		w.Header().Set("Content-Type", "application/octet-stream")
 		http.ServeFile(w, r, decPath)
 	}
