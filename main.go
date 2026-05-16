@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -64,12 +65,24 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		send: make(chan []byte, 256),
 	}
 
-	// writer goroutine
+	// writer + keepalive ping goroutine
 	go func() {
 		defer conn.Close()
-		for msg := range client.send {
-			if err := conn.WriteMessage(websocket.TextMessage, msg); err != nil {
-				return
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case msg, ok := <-client.send:
+				if !ok {
+					return
+				}
+				if err := conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+					return
+				}
+			case <-ticker.C:
+				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					return
+				}
 			}
 		}
 	}()
@@ -93,7 +106,7 @@ func uploadHandler(vaultPass string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
 		if err := r.ParseMultipartForm(maxUploadSize); err != nil {
-			jsonError(w, "File exceeds 100MB limit", 413)
+			jsonError(w, "File exceeds 500MB limit", 413)
 			return
 		}
 
@@ -109,20 +122,19 @@ func uploadHandler(vaultPass string) http.HandlerFunc {
 		tmpPath := filepath.Join(uploadFolder, filepath.Base(header.Filename))
 		tmp, err := os.Create(tmpPath)
 		if err != nil {
-    		    jsonError(w, "Server error", 500)
-    		    return
+			jsonError(w, "Server error", 500)
+			return
 		}
 		io.Copy(tmp, file)
 		tmp.Close()
 
 		encPath := filepath.Join(uploadFolder, room+".enc")
 		if err := encryptFile(tmpPath, encPath, password, room, vaultPass); err != nil {
-    		    jsonError(w, "Encryption failed", 500)
-    		    return
+			jsonError(w, "Encryption failed", 500)
+			return
 		}
 		secureShred(tmpPath, 3)
 
-		// Save original filename for receiver
 		nameFile := filepath.Join(uploadFolder, room+".name")
 		os.WriteFile(nameFile, []byte(filepath.Base(header.Filename)), 0600)
 
@@ -157,8 +169,8 @@ func downloadHandler(vaultPass string) http.HandlerFunc {
 		originalName := "SecureVault_Payload.bin"
 		nameFile := filepath.Join(uploadFolder, room+".name")
 		if b, err := os.ReadFile(nameFile); err == nil {
-    		    originalName = string(b)
-    		    os.Remove(nameFile)
+			originalName = string(b)
+			os.Remove(nameFile)
 		}
 
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+originalName+"\"")
