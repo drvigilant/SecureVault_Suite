@@ -27,14 +27,8 @@ var upgrader = websocket.Upgrader{
 func main() {
 	godotenv.Load()
 
-	secretKey := os.Getenv("FLASK_SECRET_KEY")
-	if secretKey == "" {
+	if os.Getenv("FLASK_SECRET_KEY") == "" {
 		log.Fatal("[ERROR] FLASK_SECRET_KEY not set")
-	}
-
-	vaultPass := os.Getenv("VAULT_SECRET_PASS")
-	if vaultPass == "" {
-		log.Fatal("[ERROR] VAULT_SECRET_PASS not set")
 	}
 
 	os.MkdirAll(uploadFolder, 0700)
@@ -42,8 +36,8 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", indexHandler).Methods("GET")
 	r.HandleFunc("/ws", wsHandler)
-	r.HandleFunc("/upload", uploadHandler(vaultPass)).Methods("POST")
-	r.HandleFunc("/download", downloadHandler(vaultPass)).Methods("POST")
+	r.HandleFunc("/upload", uploadHandler).Methods("POST")
+	r.HandleFunc("/download", downloadHandler).Methods("POST")
 
 	fmt.Println("[SYSTEM] SecureVault Go Engine running on :5000")
 	log.Fatal(http.ListenAndServe(":5000", r))
@@ -65,7 +59,6 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		send: make(chan []byte, 256),
 	}
 
-	// writer + keepalive ping goroutine
 	go func() {
 		defer conn.Close()
 		ticker := time.NewTicker(30 * time.Second)
@@ -87,7 +80,6 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// reader loop
 	defer func() {
 		hub.unregister(client)
 		close(client.send)
@@ -102,81 +94,93 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func uploadHandler(vaultPass string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
-		if err := r.ParseMultipartForm(maxUploadSize); err != nil {
-			jsonError(w, "File exceeds 500MB limit", 413)
-			return
-		}
-
-		password := r.FormValue("password")
-		room := r.FormValue("room")
-		file, header, err := r.FormFile("file")
-		if err != nil || password == "" || room == "" {
-			jsonError(w, "Missing data", 400)
-			return
-		}
-		defer file.Close()
-
-		tmpPath := filepath.Join(uploadFolder, filepath.Base(header.Filename))
-		tmp, err := os.Create(tmpPath)
-		if err != nil {
-			jsonError(w, "Server error", 500)
-			return
-		}
-		io.Copy(tmp, file)
-		tmp.Close()
-
-		encPath := filepath.Join(uploadFolder, room+".enc")
-		if err := encryptFile(tmpPath, encPath, password, room, vaultPass); err != nil {
-			jsonError(w, "Encryption failed", 500)
-			return
-		}
-		secureShred(tmpPath, 3)
-
-		nameFile := filepath.Join(uploadFolder, room+".name")
-		os.WriteFile(nameFile, []byte(filepath.Base(header.Filename)), 0600)
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+		jsonError(w, "File exceeds 500MB limit", 413)
+		return
 	}
+
+	room := r.FormValue("room")
+	file, header, err := r.FormFile("file")
+	if err != nil || room == "" {
+		jsonError(w, "Missing data", 400)
+		return
+	}
+	defer file.Close()
+
+	hub.mu.RLock()
+	sessionKey := hub.roomKeys[room]
+	hub.mu.RUnlock()
+
+	if sessionKey == nil {
+		jsonError(w, "ML-KEM handshake not complete", 403)
+		return
+	}
+
+	tmpPath := filepath.Join(uploadFolder, filepath.Base(header.Filename))
+	tmp, err := os.Create(tmpPath)
+	if err != nil {
+		jsonError(w, "Server error", 500)
+		return
+	}
+	io.Copy(tmp, file)
+	tmp.Close()
+
+	encPath := filepath.Join(uploadFolder, room+".enc")
+	if err := encryptFile(tmpPath, encPath, sessionKey); err != nil {
+		jsonError(w, "Encryption failed", 500)
+		return
+	}
+	secureShred(tmpPath, 3)
+
+	nameFile := filepath.Join(uploadFolder, room+".name")
+	os.WriteFile(nameFile, []byte(filepath.Base(header.Filename)), 0600)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
-func downloadHandler(vaultPass string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		r.ParseMultipartForm(1 << 20)
-		password := r.FormValue("password")
-		room := r.FormValue("room")
+func downloadHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseMultipartForm(1 << 20)
+	room := r.FormValue("room")
 
-		encPath := filepath.Join(uploadFolder, room+".enc")
-		if _, err := os.Stat(encPath); os.IsNotExist(err) {
-			jsonError(w, "Package not found", 404)
-			return
-		}
-
-		decPath := filepath.Join(uploadFolder, room+"_unlocked.bin")
-		if err := decryptFile(encPath, decPath, password, room, vaultPass); err != nil {
-			jsonError(w, "Invalid password or pulse", 401)
-			return
-		}
-
-		defer func() {
-			secureShred(encPath, 3)
-			secureShred(decPath, 3)
-		}()
-
-		originalName := "SecureVault_Payload.bin"
-		nameFile := filepath.Join(uploadFolder, room+".name")
-		if b, err := os.ReadFile(nameFile); err == nil {
-			originalName = string(b)
-			os.Remove(nameFile)
-		}
-
-		w.Header().Set("Content-Disposition", "attachment; filename=\""+originalName+"\"")
-		w.Header().Set("Content-Type", "application/octet-stream")
-		http.ServeFile(w, r, decPath)
+	encPath := filepath.Join(uploadFolder, room+".enc")
+	if _, err := os.Stat(encPath); os.IsNotExist(err) {
+		jsonError(w, "Package not found", 404)
+		return
 	}
+
+	hub.mu.RLock()
+	sessionKey := hub.roomKeys[room]
+	hub.mu.RUnlock()
+
+	if sessionKey == nil {
+		jsonError(w, "ML-KEM handshake not complete", 403)
+		return
+	}
+
+	decPath := filepath.Join(uploadFolder, room+"_unlocked.bin")
+	if err := decryptFile(encPath, decPath, sessionKey); err != nil {
+		jsonError(w, "Decryption failed", 401)
+		return
+	}
+
+	defer func() {
+		secureShred(encPath, 3)
+		secureShred(decPath, 3)
+	}()
+
+	originalName := "SecureVault_Payload.bin"
+	nameFile := filepath.Join(uploadFolder, room+".name")
+	if b, err := os.ReadFile(nameFile); err == nil {
+		originalName = string(b)
+		os.Remove(nameFile)
+	}
+
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+originalName+"\"")
+	w.Header().Set("Content-Type", "application/octet-stream")
+	http.ServeFile(w, r, decPath)
 }
 
 func jsonError(w http.ResponseWriter, msg string, code int) {
