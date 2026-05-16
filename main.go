@@ -24,9 +24,7 @@ var upgrader = websocket.Upgrader{
 }
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("[ERROR] .env file not found")
-	}
+	godotenv.Load()
 
 	secretKey := os.Getenv("FLASK_SECRET_KEY")
 	if secretKey == "" {
