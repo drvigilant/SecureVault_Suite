@@ -47,7 +47,7 @@ func main() {
 	r.HandleFunc("/download", downloadHandler(vaultPass)).Methods("POST")
 
 	fmt.Println("[SYSTEM] SecureVault Go Engine running on :5000")
-	log.Fatal(http.ListenAndServeTLS(":5000", "certs/cert.pem", "certs/key.pem", r))
+	log.Fatal(http.ListenAndServe(":5000", r))
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
